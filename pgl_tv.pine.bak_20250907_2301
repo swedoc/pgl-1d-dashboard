@@ -1,0 +1,35 @@
+//@version=5
+indicator("PGL 1D Trend Classifier (matches dashboard trend mode)", overlay=true)
+
+lenFast = input.int(20,  "EMA fast")
+lenMid  = input.int(50,  "EMA mid")
+lenSlow = input.int(100, "EMA slow")
+
+c  = request.security(syminfo.tickerid, "D", close, barmerge.gaps_off, barmerge.lookahead_off)
+e20  = ta.ema(c, lenFast)
+e50  = ta.ema(c, lenMid)
+e100 = ta.ema(c, lenSlow)
+
+// enkel lutning för 20-EMA
+slope20 = e20 - ta.ema(c[1], lenFast)
+
+isBull = c > e20 and e20 > e50 and e50 > e100 and slope20 > 0
+isBear = c < e20 and e20 < e50 and e50 < e100 and slope20 < 0
+isNeutral = not isBull and not isBear
+
+plotshape(isBull,    title="Bull",    style=shape.circle, location=location.top,    color=color.lime,   size=size.tiny, text="BULL")
+plotshape(isBear,    title="Bear",    style=shape.circle, location=location.bottom, color=color.red,    size=size.tiny, text="BEAR")
+plotshape(isNeutral, title="Neutral", style=shape.circle, location=location.price,  color=color.orange, size=size.tiny, text="NEUTRAL")
+
+plot(e20,  color=color.new(color.teal,   0), title="EMA20")
+plot(e50,  color=color.new(color.orange, 0), title="EMA50")
+plot(e100, color=color.new(color.gray,   0), title="EMA100")
+
+// liten ruta med status
+var t = table.new(position.top_right, 1, 4, border_color=color.new(color.gray,70))
+if barstate.islast
+    cls = isBull ? "BULL" : isBear ? "BEAR" : "NEUTRAL"
+    table.cell(t, 0, 0, "Class = " + cls)
+    table.cell(t, 0, 1, "EMA20 = " + str.tostring(e20, format.mintick))
+    table.cell(t, 0, 2, "EMA50 = " + str.tostring(e50, format.mintick))
+    table.cell(t, 0, 3, "EMA100 = " + str.tostring(e100, format.mintick))

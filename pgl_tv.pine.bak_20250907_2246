@@ -1,0 +1,28 @@
+//@version=5
+indicator("PGL 1D Classifier (matches dashboard)", overlay=true)
+
+bullL = input.float(0.67, "Bull L ≥", minval=0.0, maxval=1.0, step=0.01)
+bearL = input.float(0.33, "Bear L ≤", minval=0.0, maxval=1.0, step=0.01)
+
+[hi, lo, pc, cl] = request.security(syminfo.tickerid, "D", [high, low, close[1], close], barmerge.gaps_off, barmerge.lookahead_off)
+
+rng = math.max(1e-12, hi - lo)
+L = (cl - lo) / rng
+z = ((cl / math.max(1e-12, pc)) - 1) / math.max(1e-12, rng / math.max(1e-12, pc))
+
+isBull = L >= bullL and z >= 0
+isBear = L <= bearL and z <= 0
+isNeutral = not isBull and not isBear
+
+plotshape(isBull, title="Bull", style=shape.circle, location=location.top, color=color.lime, size=size.tiny, text="BULL")
+plotshape(isBear, title="Bear", style=shape.circle, location=location.bottom, color=color.red, size=size.tiny, text="BEAR")
+plotshape(isNeutral, title="Neutral", style=shape.circle, location=location.price, color=color.orange, size=size.tiny, text="NEUTRAL")
+
+// Small table to show values on the last bar
+var t = table.new(position.top_right, 1, 4, border_color=color.new(color.gray,70))
+if barstate.islast
+    table.cell(t, 0, 0, "L = " + str.tostring(L, format.mintick))
+    table.cell(t, 0, 1, "z = " + str.tostring(z, format.mintick))
+    cls = isBull ? "BULL" : isBear ? "BEAR" : "NEUTRAL"
+    table.cell(t, 0, 2, "Class = " + cls)
+    table.cell(t, 0, 3, "Hi/Lo = " + str.tostring(hi) + " / " + str.tostring(lo))

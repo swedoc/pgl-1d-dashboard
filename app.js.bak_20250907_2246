@@ -1,0 +1,117 @@
+
+// 1D Crypto Dashboard — PGL-first
+// Data: Binance /api/v3/ticker/24hr
+// Base: USDT, Top 30 by quote volume
+// PGL definition shared with pgl_tv.pine to ensure TradingView alignment.
+
+const BASE = "USDT";
+const LIMIT = 30;
+const THRESH = { bullL: 0.67, bearL: 0.33 };
+const BAN_SUFFIX = ["UP", "DOWN", "BULL", "BEAR"]; // exclude leveraged tokens
+const EXCLUDE_BASES = new Set(["USDC","FDUSD","TUSD","USDT"]);
+
+const els = {
+  lastUpdated: document.getElementById("lastUpdated"),
+  cards: document.getElementById("cards"),
+  count: {
+    bull: document.getElementById("count-bull"),
+    neutral: document.getElementById("count-neutral"),
+    bear: document.getElementById("count-bear"),
+  },
+  refresh: document.getElementById("refreshBtn")
+};
+
+function fmt(n, d=2){ return Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d}); }
+function clsColor(c){ return c === "Bull" ? "bull" : c === "Bear" ? "bear" : "neutral"; }
+function tvUrl(symbol){ return `https://www.tradingview.com/chart/?symbol=BINANCE%3A${symbol}`; }
+
+function validSymbol(sym){
+  if(!sym.endsWith(BASE)) return false;
+  for (const suf of BAN_SUFFIX){
+    if (sym.endsWith(suf + BASE)) return false;
+  }
+  const baseAsset = sym.replace(BASE, "");
+  if (EXCLUDE_BASES.has(baseAsset)) return false;
+  return true;
+}
+
+// PGL calculation exactly mirrored in pgl_tv.pine
+function calcPgl(last, prevClose, high, low){
+  const rng = Math.max(1e-12, high - low);
+  const L = (last - low) / rng;          // [0,1]
+  const z = ((last / Math.max(1e-12, prevClose)) - 1) / Math.max(1e-12, rng / Math.max(1e-12, prevClose));
+  let klass = "Neutral";
+  if(L >= THRESH.bullL && z >= 0) klass = "Bull";
+  else if(L <= THRESH.bearL && z <= 0) klass = "Bear";
+  return { L, z, klass };
+}
+
+async function load(){
+  els.refresh.disabled = true;
+  try{
+    const r = await fetch("https://api.binance.com/api/v3/ticker/24hr");
+    const all = await r.json();
+
+    // filter and sort by quoteVolume
+    const rows = all
+      .filter(t => validSymbol(t.symbol))
+      .map(t => ({
+        symbol: t.symbol,
+        base: t.symbol.replace(BASE,""),
+        last: Number(t.lastPrice),
+        high: Number(t.highPrice),
+        low: Number(t.lowPrice),
+        prevClose: Number(t.prevClosePrice),
+        chgPct: Number(t.priceChangePercent),
+        volQuote: Number(t.quoteVolume)
+      }))
+      .sort((a,b) => b.volQuote - a.volQuote)
+      .slice(0, LIMIT);
+
+    let cBull=0, cNeutral=0, cBear=0;
+    const frag = document.createDocumentFragment();
+    els.cards.innerHTML = "";
+
+    for(const t of rows){
+      const {L, z, klass} = calcPgl(t.last, t.prevClose, t.high, t.low);
+      if(klass==="Bull") cBull++; else if(klass==="Bear") cBear++; else cNeutral++;
+
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="head">
+          <div class="badge">
+            <span class="dot ${clsColor(klass)}"></span>
+            <span class="lab">${t.base}</span>
+          </div>
+          <span class="sub">${t.symbol}</span>
+        </div>
+        <div class="price">$${fmt(t.last,2)} <span class="sub">(${t.chgPct>0?"+":""}${fmt(t.chgPct,2)}% 24h)</span></div>
+        <div class="kv">
+          <div><span>High 24h</span>$${fmt(t.high,2)}</div>
+          <div><span>Low 24h</span>$${fmt(t.low,2)}</div>
+          <div><span>PGL L</span>${fmt(L,2)}</div>
+          <div><span>Z</span>${fmt(z,2)}</div>
+        </div>
+        <div class="actions">
+          <a href="${tvUrl(t.symbol)}" target="_blank" rel="noopener">Open in TradingView</a>
+          <a href="https://www.binance.com/en/trade/${t.base}_${BASE}" target="_blank" rel="noopener">Open on Binance</a>
+        </div>
+      `;
+      frag.appendChild(card);
+    }
+
+    els.cards.appendChild(frag);
+    els.count.bull.textContent = cBull;
+    els.count.neutral.textContent = cNeutral;
+    els.count.bear.textContent = cBear;
+    els.lastUpdated.textContent = "Last updated: " + new Date().toLocaleString();
+  }catch(err){
+    els.cards.innerHTML = `<div class="card"><div class="sub">Error: ${err}</div><div class="sub">If your browser blocks direct API calls, run a local server:</div><div class="kv"><div><span>Python</span>python3 -m http.server 8000</div><div><span>Open</span>http://127.0.0.1:8000/index.html</div></div></div>`;
+  }finally{
+    els.refresh.disabled = false;
+  }
+}
+
+els.refresh.addEventListener("click", load);
+load();

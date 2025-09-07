@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>1D Crypto Dashboard — PGL-first (Top 30 by Volume)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>1D Crypto Dashboard</h1>
+    <div class="meta">
+      <span id="lastUpdated">Last updated: —</span>
+      <button id="refreshBtn">Refresh</button>
+    </div>
+  </header>
+
+  <section class="chips">
+    <div class="chip"><span class="dot bull"></span> Bull <span id="count-bull" class="count">0</span></div>
+    <div class="chip"><span class="dot neutral"></span> Neutral <span id="count-neutral" class="count">0</span></div>
+    <div class="chip"><span class="dot bear"></span> Bear <span id="count-bear" class="count">0</span></div>
+  </section>
+
+  <section class="grid" id="cards"></section>
+
+  <footer class="foot">
+    <p>PGL definition is identical across this page and the included TradingView Pine script. Thresholds: bull if L ≥ 0.67 and z ≥ 0; bear if L ≤ 0.33 and z ≤ 0; else neutral. Base: USDT. Top 30 by quote volume.</p>
+    <p><a href="pgl_tv.pine" download>Download Pine Script (pgl_tv.pine)</a> to verify on TradingView.</p>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

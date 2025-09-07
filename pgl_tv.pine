@@ -1,0 +1,34 @@
+//@version=5
+indicator("Trend Classifier (1D, matches dashboard)", overlay=true)
+
+lenFast = input.int(20,  "EMA fast")
+lenMid  = input.int(50,  "EMA mid")
+lenSlow = input.int(100, "EMA slow")
+minSlopePct = input.float(0.05, "Min Slope20 %", minval=0.0) // 0.05 %
+
+c  = request.security(syminfo.tickerid, "D", close, barmerge.gaps_off, barmerge.lookahead_off)
+e20  = ta.ema(c, lenFast)
+e50  = ta.ema(c, lenMid)
+e100 = ta.ema(c, lenSlow)
+
+slopePct = (e20 - e20[1]) / math.max(1e-12, e20) // ≈ ΔEMA20 / EMA20
+
+isBull = c > e50 and e20 > e50 and e50 > e100 and slopePct > minSlopePct/100.0
+isBear = c < e50 and e20 < e50 and e50 < e100 and slopePct < -minSlopePct/100.0
+isNeutral = not isBull and not isBear
+
+plotshape(isBull,    title="Bull",    style=shape.circle, location=location.top,    color=color.lime,   size=size.tiny, text="BULL")
+plotshape(isBear,    title="Bear",    style=shape.circle, location=location.bottom, color=color.red,    size=size.tiny, text="BEAR")
+plotshape(isNeutral, title="Neutral", style=shape.circle, location=location.price,  color=color.orange, size=size.tiny, text="NEUTRAL")
+
+plot(e20,  color=color.new(color.teal,   0), title="EMA20")
+plot(e50,  color=color.new(color.orange, 0), title="EMA50")
+plot(e100, color=color.new(color.gray,   0), title="EMA100")
+
+var t = table.new(position.top_right, 1, 4, border_color=color.new(color.gray,70))
+if barstate.islast
+    cls = isBull ? "BULL" : isBear ? "BEAR" : "NEUTRAL"
+    table.cell(t, 0, 0, "Class = " + cls)
+    table.cell(t, 0, 1, "Slope20% = " + str.tostring(slopePct*100, format.mintick) + "%")
+    table.cell(t, 0, 2, "EMA20 = " + str.tostring(e20, format.mintick))
+    table.cell(t, 0, 3, "EMA50/100 = " + str.tostring(e50, format.mintick) + " / " + str.tostring(e100, format.mintick))

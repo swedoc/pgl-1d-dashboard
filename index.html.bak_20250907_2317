@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>1D Crypto Dashboard — Trend + PGL</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>1D Crypto Dashboard</h1>
+    <div class="meta">
+      <span id="lastUpdated">Last updated: —</span>
+      <button id="refreshBtn">Refresh</button>
+    </div>
+  </header>
+
+  <section class="chips">
+    <div class="chip"><span class="dot bull"></span> Bull <span id="count-bull" class="count">0</span></div>
+    <div class="chip"><span class="dot neutral"></span> Neutral <span id="count-neutral" class="count">0</span></div>
+    <div class="chip"><span class="dot bear"></span> Bear <span id="count-bear" class="count">0</span></div>
+  </section>
+
+  <section class="grid" id="cards"></section>
+
+  <section id="news" class="news">
+    <h2>Today’s Crypto News</h2>
+    <ul id="newsList" class="news-list"></ul>
+    <div id="newsNote" class="news-note sub"></div>
+  </section>
+
+  <footer class="foot">
+    <h3>What this dashboard shows</h3>
+    <p><strong>Trend color (1D):</strong> The dot color is based on the daily trend. Bull if <em>Close &gt; EMA50</em>, <em>EMA20 &gt; EMA50 &gt; EMA100</em>, and <em>EMA20 slope &gt; +0.05%</em>. Bear if <em>Close &lt; EMA50</em>, <em>EMA20 &lt; EMA50 &lt; EMA100</em>, and <em>EMA20 slope &lt; −0.05%</em>. Otherwise Neutral.</p>
+    <p><strong>PGL (momentum):</strong> L = (close − 24h low) / (24h high − 24h low). z = return vs prev close normalized by 24h range. We label momentum as Up if z ≥ 0 and L ≥ 0.60, Down if z ≤ 0 and L ≤ 0.40, Mid otherwise. PGL does not control color; it’s context.</p>
+    <p><strong>Each card:</strong> price and 24h change, 24h high/low, PGL L and z (intraday momentum), EMA20/50/100 and EMA20 slope% (trend). Links: open the exact symbol on TradingView and Binance.</p>
+    <p class="sub"><strong>Disclaimer:</strong> This is structured market information, <em>not financial advice</em>. Do your own research and manage your risk.</p>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
