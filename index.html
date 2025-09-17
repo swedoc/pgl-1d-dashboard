@@ -42,13 +42,16 @@
     <div class="tags">#Bitcoin #Ethereum #Breadth #Volatility</div>
   </section>
 
-  <footer class="foot">
-    <h3>What this dashboard shows</h3>
-    <p><strong>Trend color (1D):</strong> The dot color is based on the daily trend. Bull if <em>Close &gt; EMA50</em>, <em>EMA20 &gt; EMA50 &gt; EMA100</em>, and <em>EMA20 slope &gt; +0.05%</em>. Bear if <em>Close &lt; EMA50</em>, <em>EMA20 &lt; EMA50 &lt; EMA100</em>, and <em>EMA20 slope &lt; −0.05%</em>. Otherwise Neutral.</p>
-    <p><strong>PGL (momentum):</strong> L = (close − 24h low) / (24h high − 24h low). z = return vs prev close normalized by 24h range. Momentum label: Up if z ≥ 0 and L ≥ 0.60, Down if z ≤ 0 and L ≤ 0.40, Mid otherwise. PGL does not control color; it’s context.</p>
-    <p><strong>Each card:</strong> price and 24h change, 24h high/low, PGL L and z (intraday momentum), EMA20/50/100 and EMA20 slope% (trend). Links: open the exact symbol on TradingView and Binance.</p>
-    <p class="disclaimer"><strong>Disclaimer:</strong> This is structured market information and educational content, <em>not financial advice</em>. Markets carry risk; manage position sizing and stops.</p>
-  </footer>
+<footer class="foot">
+  <h3>What this dashboard shows</h3>
+  <p><strong>Trend color (1D):</strong> The dot color is based on the daily trend. Bull if <em>Close &gt; EMA50</em>, <em>EMA20 &gt; EMA50 &gt; EMA100</em>, and <em>EMA20 slope &gt; +0.05%</em>. Bear if <em>Close &lt; EMA50</em>, <em>EMA20 &lt; EMA50 &lt; EMA100</em>, and <em>EMA20 slope &lt; −0.05%</em>. Otherwise Neutral.</p>
+  <p><strong>PGL (momentum):</strong> L = (close − 24h low) / (24h high − 24h low). z = return vs prev close normalized by 24h range. Momentum label: Up if z ≥ 0 and L ≥ 0.60, Down if z ≤ 0 and L ≤ 0.40, Mid otherwise. PGL does not control color; it’s context.</p>
+  <p><strong>Each card:</strong> price and 24h change, 24h high/low, PGL L and z (intraday momentum), EMA20/50/100 and EMA20 slope% (trend). Links: open the exact symbol on TradingView and Binance.</p>
+  
+  <div style="max-width: 400px; margin: 20px auto; color: #888; font-size: 0.8em; text-align: center; font-style: italic;">
+    The information, analysis and recommendations provided by this dashboard are for educational and informational purposes only and do not constitute financial, investment, tax or legal advice. Nothing on this platform should be construed as a recommendation or solicitation to buy, sell or hold any cryptocurrency or other financial instrument. Cryptocurrency trading involves substantial risks, including market volatility, liquidity constraints and regulatory uncertainty; losses can exceed initial capital. You are solely responsible for evaluating the merits and risks of any transaction, and you should consult a qualified financial, tax or legal professional before making any investment decision. Past performance is not indicative of future results. By using this dashboard, you acknowledge and accept full responsibility for your own trading decisions and agree that neither the dashboard’s creators nor any affiliates can be held liable for any gains, losses or damages arising from your use of the information provided.
+  </div>
+</footer>
 
   <script src="app.js" defer></script>
 </body>
