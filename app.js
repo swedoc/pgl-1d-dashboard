@@ -1,14 +1,12 @@
 // 1D Crypto Dashboard — Trend colors, PGL momentum, class-sorted + News + Market Overview
 
+const BUILD = "2025-12-29T17:56Z"; // <--- if you don't see this in UI, you're not loading this file
 const BASE = "USDT";
 const LIMIT = 30;
 const BAN_SUFFIX = ["UP", "DOWN", "BULL", "BEAR"];
 
-// Explicit stablecoin hides (symbol bases). Keep as a "known list".
-const EXCLUDE_BASES = new Set([
-  "USDC","FDUSD","TUSD",
-  "USD1","XUSD","USDE" // <-- add the ones you saw
-]);
+// Explicit stablecoin hides (keep, but don't rely only on this)
+const EXCLUDE_BASES = new Set(["USDC","FDUSD","TUSD","USD1","XUSD","USDE"]);
 
 const ORDER_MODE = "class"; // Bull -> Neutral -> Bear
 
@@ -53,21 +51,21 @@ function validSymbol(sym){
   return true;
 }
 
-// Heuristic: filter likely stables even if not listed.
-// Triggers for "USD-ish" bases OR price ~1 with tiny daily range.
+// Heuristic stable filter: catches new synthetic dollars too.
+// - bases starting with USD*
+// - OR price ~1 and tiny daily range
 function isLikelyStable(baseAsset, last, high, low, prevClose){
-  if (!baseAsset) return false;
+  if(!baseAsset) return false;
 
-  // Most synthetic dollars are USD* (USD1, USDE, USDP, etc.)
-  // Keep it strict-ish: starts with "USD" catches the junk, doesn't kill e.g. PAXG.
-  if (baseAsset.startsWith("USD")) return true;
+  // kill USD* synthetics (USD1, USDE, USDJ, etc.)
+  if(baseAsset.startsWith("USD")) return true;
 
   const pc = Math.max(1e-12, prevClose);
   const rangePct = ((high - low) / pc) * 100;
   const nearOne = last >= 0.985 && last <= 1.015;
 
-  // If it behaves like a stablecoin, treat it like one.
-  if (nearOne && rangePct < 0.35) return true;
+  // if it trades like a stablecoin, treat it like one
+  if(nearOne && rangePct < 0.50) return true;
 
   return false;
 }
@@ -184,14 +182,12 @@ function summarize(rows){
   const BTC = rows.find(r => r.base==="BTC");
   const ETH = rows.find(r => r.base==="ETH");
 
-  // Sentiment line
   let sent = "Mixed conditions.";
   if (breadth >= 0.6) sent = "Positive bias: breadth is supportive.";
   else if (breadth <= 0.4) sent = "Negative bias: breadth is weak.";
   else if (breadth > 0.5) sent = "Slightly positive: breadth improving.";
   else if (breadth < 0.5) sent = "Slightly negative: breadth softening.";
 
-  // Volatility label from avg 24h range
   let vol = "normal volatility";
   if (avgRange < 2) vol = "subdued volatility";
   else if (avgRange > 4) vol = "elevated volatility";
@@ -201,7 +197,6 @@ function summarize(rows){
     `${sent} ${pct(bull.length/total*100,1)} Bull, ${pct(neutral.length/total*100,1)} Neutral, ${pct(bear.length/total*100,1)} Bear. ` +
     `Average 24h range: ${fmt(avgRange,1)}% (${vol}).`;
 
-  // Signals & triggers bullets
   const sigs = [];
   if (BTC) sigs.push(`BTC trend: ${BTC.klass}${BTC.slopePct!=null?` (EMA20 slope ${fmt(BTC.slopePct*100,2)}%)`:""}.`);
   if (ETH) sigs.push(`ETH trend: ${ETH.klass}${ETH.slopePct!=null?` (EMA20 slope ${fmt(ETH.slopePct*100,2)}%)`:""}.`);
@@ -215,13 +210,12 @@ function summarize(rows){
     els.sumSigs.appendChild(li);
   });
 
-  // Interpretation (do NOT repeat the "Context (1D)" label here; HTML already has it)
-  let interp = "Range likely with directional moves driven by momentum pockets; respect EMA50 flips.";
+  // IMPORTANT: no "Context (1D):" prefix here (HTML already has that heading)
+  let interp = "Downside bias if BTC remains below EMA50 and breadth stays weak. Screening context only, not a trade instruction.";
   if (BTC && BTC.klass==="Bull" && altBreadth>0.5) {
     interp = "Constructive uptrend while BTC holds above EMA50; dips likely get bought in leaders.";
-  }
-  if (BTC && BTC.klass==="Bear") {
-    interp = "Downside bias while BTC remains below EMA50 and breadth is weak. Screening context only, not a trade instruction.";
+  } else if (BTC && BTC.klass!=="Bear") {
+    interp = "Range-ish regime: watch EMA50 flips and momentum pockets; screen first, act elsewhere.";
   }
   els.sumInterp.textContent = interp;
 }
@@ -244,15 +238,12 @@ async function load(){
         const prevClose = Number(t.prevClosePrice);
         const chgPct = Number(t.priceChangePercent);
         const volQuote = Number(t.quoteVolume);
-
         return { symbol, base, last, high, low, prevClose, chgPct, volQuote };
       })
-      // extra stablecoin filter (runtime heuristic)
       .filter(t => !isLikelyStable(t.base, t.last, t.high, t.low, t.prevClose))
       .sort((a,b) => b.volQuote - a.volQuote)
       .slice(0, LIMIT);
 
-    // Enrich with PGL and Trend
     const enriched = await Promise.all(baseRows.map(async t => {
       const pgl = calcPgl(t.last, t.prevClose, t.high, t.low);
       let e20=null,e50=null,e100=null, slopePct=null, klass="Neutral";
@@ -272,7 +263,6 @@ async function load(){
       return {...t, pgl, e20, e50, e100, slopePct, klass};
     }));
 
-    // Sort Bull -> Neutral -> Bear, then by volume
     const rank = { "Bull": 0, "Neutral": 1, "Bear": 2 };
     const rows = enriched.sort((a,b) => {
       const rc = (rank[a.klass] ?? 9) - (rank[b.klass] ?? 9);
@@ -280,7 +270,6 @@ async function load(){
       return b.volQuote - a.volQuote;
     });
 
-    // Render cards
     let cBull=0, cNeutral=0, cBear=0;
     els.cards.innerHTML = "";
     const frag = document.createDocumentFragment();
@@ -331,9 +320,8 @@ async function load(){
     els.count.bull.textContent = cBull;
     els.count.neutral.textContent = cNeutral;
     els.count.bear.textContent = cBear;
-    els.lastUpdated.textContent = "Last updated: " + new Date().toLocaleString();
+    els.lastUpdated.textContent = "Last updated: " + new Date().toLocaleString() + ` (build ${BUILD})`;
 
-    // Summary + News
     summarize(rows);
     loadNews();
   }catch(err){
