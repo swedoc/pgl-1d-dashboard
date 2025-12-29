@@ -3,7 +3,13 @@
 const BASE = "USDT";
 const LIMIT = 30;
 const BAN_SUFFIX = ["UP", "DOWN", "BULL", "BEAR"];
-const EXCLUDE_BASES = new Set(["USDC","FDUSD","TUSD"]); // hide stablecoins
+
+// Hide stablecoins / stable-like symbols that ruin PGL readability
+const EXCLUDE_BASES = new Set([
+  "USDC","FDUSD","TUSD","USDP","DAI",
+  "USD1","XUSD"
+]);
+
 const ORDER_MODE = "class"; // Bull -> Neutral -> Bear
 
 // PGL (momentum only)
@@ -15,6 +21,9 @@ const NEWS_FEEDS = [
   "https://cointelegraph.com/rss",
   "https://decrypt.co/feed"
 ];
+
+// Light “quality” filter for obvious promo/spam headlines
+const NEWS_BLOCKLIST_RE = /\b(airdrop|tge|presale|pre-sale|100x|100\s*x|pump|signals?|call\s*now|whale|giveaway|moon)\b/i;
 
 const els = {
   lastUpdated: document.getElementById("lastUpdated"),
@@ -115,13 +124,18 @@ async function loadNews(){
     for (const r of results){
       if (r.status === "fulfilled") items.push(...r.value);
     }
+
+    // De-dup + filter trash headlines
     const seen = new Set();
     items = items.filter(it => {
       const key = it.link || it.title;
       if(!key || seen.has(key)) return false;
+      if(!it.title) return false;
+      if(NEWS_BLOCKLIST_RE.test(it.title)) return false;
       seen.add(key);
       return true;
     });
+
     items.sort((a,b) => new Date(b.pubDate||0) - new Date(a.pubDate||0));
     items = items.slice(0, 10);
 
@@ -135,7 +149,7 @@ async function loadNews(){
       `;
       els.newsList.appendChild(li);
     }
-    els.newsNote.textContent = items.length ? "" : "No items found. Feeds may be blocked.";
+    els.newsNote.textContent = items.length ? "" : "No items found. Feeds may be blocked or filtered.";
   }catch(e){
     els.newsNote.textContent = `News unavailable (${e.message}).`;
   }
@@ -187,11 +201,15 @@ function summarize(rows){
     els.sumSigs.appendChild(li);
   });
 
-  // Interpretation
-  let interp = "Base case: range with directional moves driven by momentum pockets; respect EMA50 flips.";
-  if (BTC && BTC.klass==="Bull" && altBreadth>0.5) interp = "Base case: constructive uptrend while BTC holds above EMA50; dips likely get bought in leaders.";
-  if (BTC && BTC.klass==="Bear") interp = "Regime context: downside bias while BTC remains below EMA50 and breadth is weak. This is screening context, not an actionable edge or a trade instruction.";
-  els.sumInterp.textContent = interp;
+  // Context (1D)
+  let context = "Context (1D): range with directional moves driven by momentum pockets; respect EMA50 flips.";
+  if (BTC && BTC.klass==="Bull" && altBreadth>0.5) {
+    context = "Context (1D): constructive regime while BTC holds above EMA50 and breadth improves. This is screening context, not an actionable edge or a trade instruction.";
+  }
+  if (BTC && BTC.klass==="Bear") {
+    context = "Context (1D): downside bias while BTC remains below EMA50 and breadth is weak. This is screening context, not an actionable edge or a trade instruction.";
+  }
+  els.sumInterp.textContent = context;
 }
 
 // --- MAIN LOAD ---
