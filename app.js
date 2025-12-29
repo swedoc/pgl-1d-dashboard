@@ -1,14 +1,12 @@
 // 1D Crypto Dashboard — Trend colors, PGL momentum, class-sorted + News + Market Overview
 
-const BUILD = "2025-12-29T17:56Z"; // <--- if you don't see this in UI, you're not loading this file
+const BUILD = "2025-12-29T18:00Z"; // if you don't see this, wrong file is loaded
 const BASE = "USDT";
 const LIMIT = 30;
 const BAN_SUFFIX = ["UP", "DOWN", "BULL", "BEAR"];
 
-// Explicit stablecoin hides (keep, but don't rely only on this)
 const EXCLUDE_BASES = new Set(["USDC","FDUSD","TUSD","USD1","XUSD","USDE"]);
-
-const ORDER_MODE = "class"; // Bull -> Neutral -> Bear
+const ORDER_MODE = "class";
 
 // PGL (momentum only)
 const PGL_THRESH = { upL: 0.60, downL: 0.40 };
@@ -51,29 +49,21 @@ function validSymbol(sym){
   return true;
 }
 
-// Heuristic stable filter: catches new synthetic dollars too.
-// - bases starting with USD*
-// - OR price ~1 and tiny daily range
 function isLikelyStable(baseAsset, last, high, low, prevClose){
   if(!baseAsset) return false;
-
-  // kill USD* synthetics (USD1, USDE, USDJ, etc.)
   if(baseAsset.startsWith("USD")) return true;
 
   const pc = Math.max(1e-12, prevClose);
   const rangePct = ((high - low) / pc) * 100;
   const nearOne = last >= 0.985 && last <= 1.015;
-
-  // if it trades like a stablecoin, treat it like one
   if(nearOne && rangePct < 0.50) return true;
-
   return false;
 }
 
-// --- PGL (momentum) from Binance 24h-ticker ---
+// --- PGL (momentum) ---
 function calcPgl(last, prevClose, high, low){
   const rng = Math.max(1e-12, high - low);
-  const L = (last - low) / rng; // [0,1]
+  const L = (last - low) / rng;
   const z = ((last / Math.max(1e-12, prevClose)) - 1) / Math.max(1e-12, rng / Math.max(1e-12, prevClose));
   let momentum = "Mid";
   if (z >= 0 && L >= PGL_THRESH.upL) momentum = "Up";
@@ -86,7 +76,7 @@ async function fetchDaily(symbol, limit=250){
   const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&limit=${limit}`;
   const r = await fetch(url);
   const data = await r.json();
-  return data.map(k => Number(k[4])); // closes
+  return data.map(k => Number(k[4]));
 }
 function ema(arr, period){
   const k = 2/(period+1);
@@ -99,14 +89,14 @@ function ema(arr, period){
   return out;
 }
 function trendClass(close, e20, e50, e100, e20_prev){
-  const slopePct = (e20 - e20_prev) / Math.max(1e-12, e20); // ΔEMA20 / EMA20
-  const minSlope = 0.0005; // 0.05%
+  const slopePct = (e20 - e20_prev) / Math.max(1e-12, e20);
+  const minSlope = 0.0005;
   if (close > e50 && e20 > e50 && e50 > e100 && slopePct >  minSlope) return {klass:"Bull", slopePct};
   if (close < e50 && e20 < e50 && e50 < e100 && slopePct < -minSlope) return {klass:"Bear", slopePct};
   return {klass:"Neutral", slopePct};
 }
 
-// --- NEWS (RSS via AllOrigins) ---
+// --- NEWS ---
 function timeAgo(ts){
   const t = new Date(ts).getTime();
   if (isNaN(t)) return "";
@@ -192,8 +182,8 @@ function summarize(rows){
   if (avgRange < 2) vol = "subdued volatility";
   else if (avgRange > 4) vol = "elevated volatility";
 
+  // IMPORTANT: do NOT repeat the "screening context" line here if HTML already has it
   els.sumSent.textContent =
-    `1D screening & regime context only. Describes conditions, not actions.\n\n` +
     `${sent} ${pct(bull.length/total*100,1)} Bull, ${pct(neutral.length/total*100,1)} Neutral, ${pct(bear.length/total*100,1)} Bear. ` +
     `Average 24h range: ${fmt(avgRange,1)}% (${vol}).`;
 
@@ -210,13 +200,9 @@ function summarize(rows){
     els.sumSigs.appendChild(li);
   });
 
-  // IMPORTANT: no "Context (1D):" prefix here (HTML already has that heading)
-  let interp = "Downside bias if BTC remains below EMA50 and breadth stays weak. Screening context only, not a trade instruction.";
-  if (BTC && BTC.klass==="Bull" && altBreadth>0.5) {
-    interp = "Constructive uptrend while BTC holds above EMA50; dips likely get bought in leaders.";
-  } else if (BTC && BTC.klass!=="Bear") {
-    interp = "Range-ish regime: watch EMA50 flips and momentum pockets; screen first, act elsewhere.";
-  }
+  let interp = "Downside bias while BTC remains below EMA50 and breadth is weak. Screening context only, not a trade instruction.";
+  if (BTC && BTC.klass==="Bull" && altBreadth>0.5) interp = "Constructive uptrend while BTC holds above EMA50; dips likely get bought in leaders.";
+  if (BTC && BTC.klass!=="Bear" && !(BTC.klass==="Bull" && altBreadth>0.5)) interp = "Range-ish regime: watch EMA50 flips and momentum pockets; screen first, act elsewhere.";
   els.sumInterp.textContent = interp;
 }
 
@@ -320,6 +306,7 @@ async function load(){
     els.count.bull.textContent = cBull;
     els.count.neutral.textContent = cNeutral;
     els.count.bear.textContent = cBear;
+
     els.lastUpdated.textContent = "Last updated: " + new Date().toLocaleString() + ` (build ${BUILD})`;
 
     summarize(rows);
