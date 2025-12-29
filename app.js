@@ -1,12 +1,10 @@
 // 1D Crypto Dashboard — Trend colors, PGL momentum, class-sorted + News + Market Overview
 
-const BUILD = "2025-12-29T18:00Z"; // if you don't see this, wrong file is loaded
 const BASE = "USDT";
 const LIMIT = 30;
 const BAN_SUFFIX = ["UP", "DOWN", "BULL", "BEAR"];
-
-const EXCLUDE_BASES = new Set(["USDC","FDUSD","TUSD","USD1","XUSD","USDE"]);
-const ORDER_MODE = "class";
+const EXCLUDE_BASES = new Set(["USDC","FDUSD","TUSD"]); // hide stablecoins
+const ORDER_MODE = "class"; // Bull -> Neutral -> Bear
 
 // PGL (momentum only)
 const PGL_THRESH = { upL: 0.60, downL: 0.40 };
@@ -49,21 +47,10 @@ function validSymbol(sym){
   return true;
 }
 
-function isLikelyStable(baseAsset, last, high, low, prevClose){
-  if(!baseAsset) return false;
-  if(baseAsset.startsWith("USD")) return true;
-
-  const pc = Math.max(1e-12, prevClose);
-  const rangePct = ((high - low) / pc) * 100;
-  const nearOne = last >= 0.985 && last <= 1.015;
-  if(nearOne && rangePct < 0.50) return true;
-  return false;
-}
-
-// --- PGL (momentum) ---
+// --- PGL (momentum) from Binance 24h-ticker ---
 function calcPgl(last, prevClose, high, low){
   const rng = Math.max(1e-12, high - low);
-  const L = (last - low) / rng;
+  const L = (last - low) / rng; // [0,1]
   const z = ((last / Math.max(1e-12, prevClose)) - 1) / Math.max(1e-12, rng / Math.max(1e-12, prevClose));
   let momentum = "Mid";
   if (z >= 0 && L >= PGL_THRESH.upL) momentum = "Up";
@@ -76,7 +63,7 @@ async function fetchDaily(symbol, limit=250){
   const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&limit=${limit}`;
   const r = await fetch(url);
   const data = await r.json();
-  return data.map(k => Number(k[4]));
+  return data.map(k => Number(k[4])); // closes
 }
 function ema(arr, period){
   const k = 2/(period+1);
@@ -89,14 +76,14 @@ function ema(arr, period){
   return out;
 }
 function trendClass(close, e20, e50, e100, e20_prev){
-  const slopePct = (e20 - e20_prev) / Math.max(1e-12, e20);
-  const minSlope = 0.0005;
+  const slopePct = (e20 - e20_prev) / Math.max(1e-12, e20); // ΔEMA20 / EMA20
+  const minSlope = 0.0005; // 0.05%
   if (close > e50 && e20 > e50 && e50 > e100 && slopePct >  minSlope) return {klass:"Bull", slopePct};
   if (close < e50 && e20 < e50 && e50 < e100 && slopePct < -minSlope) return {klass:"Bear", slopePct};
   return {klass:"Neutral", slopePct};
 }
 
-// --- NEWS ---
+// --- NEWS (RSS via AllOrigins) ---
 function timeAgo(ts){
   const t = new Date(ts).getTime();
   if (isNaN(t)) return "";
@@ -154,6 +141,16 @@ async function loadNews(){
   }
 }
 
+// --- SUMMARY HELPERS ---
+// Removes accidental duplication if the same screening sentence ends up in JS summary.
+function stripScreeningPrefix(s){
+  if(!s) return s;
+  const p = "1D screening & regime context only. Describes conditions, not actions.";
+  let out = String(s).trimStart();
+  while (out.startsWith(p)) out = out.slice(p.length).trimStart();
+  return out;
+}
+
 // --- SUMMARY ---
 function summarize(rows){
   const total = rows.length || 1;
@@ -172,21 +169,26 @@ function summarize(rows){
   const BTC = rows.find(r => r.base==="BTC");
   const ETH = rows.find(r => r.base==="ETH");
 
+  // Sentiment line
   let sent = "Mixed conditions.";
   if (breadth >= 0.6) sent = "Positive bias: breadth is supportive.";
   else if (breadth <= 0.4) sent = "Negative bias: breadth is weak.";
   else if (breadth > 0.5) sent = "Slightly positive: breadth improving.";
   else if (breadth < 0.5) sent = "Slightly negative: breadth softening.";
 
+  // Volatility label from avg 24h range
   let vol = "normal volatility";
   if (avgRange < 2) vol = "subdued volatility";
   else if (avgRange > 4) vol = "elevated volatility";
 
-  // IMPORTANT: do NOT repeat the "screening context" line here if HTML already has it
-  els.sumSent.textContent =
+  const sentLine =
     `${sent} ${pct(bull.length/total*100,1)} Bull, ${pct(neutral.length/total*100,1)} Neutral, ${pct(bear.length/total*100,1)} Bear. ` +
     `Average 24h range: ${fmt(avgRange,1)}% (${vol}).`;
 
+  // Make summary resilient if an older build accidentally prepends the screening sentence.
+  els.sumSent.textContent = stripScreeningPrefix(sentLine);
+
+  // Signals & triggers bullets
   const sigs = [];
   if (BTC) sigs.push(`BTC trend: ${BTC.klass}${BTC.slopePct!=null?` (EMA20 slope ${fmt(BTC.slopePct*100,2)}%)`:""}.`);
   if (ETH) sigs.push(`ETH trend: ${ETH.klass}${ETH.slopePct!=null?` (EMA20 slope ${fmt(ETH.slopePct*100,2)}%)`:""}.`);
@@ -200,9 +202,10 @@ function summarize(rows){
     els.sumSigs.appendChild(li);
   });
 
-  let interp = "Downside bias while BTC remains below EMA50 and breadth is weak. Screening context only, not a trade instruction.";
-  if (BTC && BTC.klass==="Bull" && altBreadth>0.5) interp = "Constructive uptrend while BTC holds above EMA50; dips likely get bought in leaders.";
-  if (BTC && BTC.klass!=="Bear" && !(BTC.klass==="Bull" && altBreadth>0.5)) interp = "Range-ish regime: watch EMA50 flips and momentum pockets; screen first, act elsewhere.";
+  // Interpretation
+  let interp = "Base case: range with directional moves driven by momentum pockets; respect EMA50 flips.";
+  if (BTC && BTC.klass==="Bull" && altBreadth>0.5) interp = "Base case: constructive uptrend while BTC holds above EMA50; dips likely get bought in leaders.";
+  if (BTC && BTC.klass==="Bear") interp = "Regime context: downside bias while BTC remains below EMA50 and breadth is weak. This is screening context, not an actionable edge or a trade instruction.";
   els.sumInterp.textContent = interp;
 }
 
@@ -215,21 +218,20 @@ async function load(){
 
     const baseRows = all
       .filter(t => validSymbol(t.symbol))
-      .map(t => {
-        const symbol = t.symbol;
-        const base = symbol.replace(BASE,"");
-        const last = Number(t.lastPrice);
-        const high = Number(t.highPrice);
-        const low  = Number(t.lowPrice);
-        const prevClose = Number(t.prevClosePrice);
-        const chgPct = Number(t.priceChangePercent);
-        const volQuote = Number(t.quoteVolume);
-        return { symbol, base, last, high, low, prevClose, chgPct, volQuote };
-      })
-      .filter(t => !isLikelyStable(t.base, t.last, t.high, t.low, t.prevClose))
+      .map(t => ({
+        symbol: t.symbol,
+        base: t.symbol.replace(BASE,""),
+        last: Number(t.lastPrice),
+        high: Number(t.highPrice),
+        low: Number(t.lowPrice),
+        prevClose: Number(t.prevClosePrice),
+        chgPct: Number(t.priceChangePercent),
+        volQuote: Number(t.quoteVolume)
+      }))
       .sort((a,b) => b.volQuote - a.volQuote)
       .slice(0, LIMIT);
 
+    // Enrich with PGL and Trend
     const enriched = await Promise.all(baseRows.map(async t => {
       const pgl = calcPgl(t.last, t.prevClose, t.high, t.low);
       let e20=null,e50=null,e100=null, slopePct=null, klass="Neutral";
@@ -249,6 +251,7 @@ async function load(){
       return {...t, pgl, e20, e50, e100, slopePct, klass};
     }));
 
+    // Sort Bull -> Neutral -> Bear, then by volume
     const rank = { "Bull": 0, "Neutral": 1, "Bear": 2 };
     const rows = enriched.sort((a,b) => {
       const rc = (rank[a.klass] ?? 9) - (rank[b.klass] ?? 9);
@@ -256,6 +259,7 @@ async function load(){
       return b.volQuote - a.volQuote;
     });
 
+    // Render cards
     let cBull=0, cNeutral=0, cBear=0;
     els.cards.innerHTML = "";
     const frag = document.createDocumentFragment();
@@ -306,9 +310,9 @@ async function load(){
     els.count.bull.textContent = cBull;
     els.count.neutral.textContent = cNeutral;
     els.count.bear.textContent = cBear;
+    els.lastUpdated.textContent = "Last updated: " + new Date().toLocaleString();
 
-    els.lastUpdated.textContent = "Last updated: " + new Date().toLocaleString() + ` (build ${BUILD})`;
-
+    // Summary + News
     summarize(rows);
     loadNews();
   }catch(err){
