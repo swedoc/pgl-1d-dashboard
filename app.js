@@ -190,7 +190,7 @@ function summarize(rows){
   // Interpretation
   let interp = "Base case: range with directional moves driven by momentum pockets; respect EMA50 flips.";
   if (BTC && BTC.klass==="Bull" && altBreadth>0.5) interp = "Base case: constructive uptrend while BTC holds above EMA50; dips likely get bought in leaders.";
-  if (BTC && BTC.klass==="Bear") interp = "Base case: downside risk while BTC remains below EMA50; fade weak bounces, wait for slope to stabilize.";
+  if (BTC && BTC.klass==="Bear") interp = "Regime context: downside bias while BTC remains below EMA50 and breadth is weak. This is screening context, not an actionable edge or a trade instruction.";
   els.sumInterp.textContent = interp;
 }
 
